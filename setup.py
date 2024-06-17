@@ -45,7 +45,7 @@ def get_install_requires():
     install_requires = [
         "imgviz>=0.11",
         "natsort>=7.1.0",
-        "numpy==1.9",
+        "numpy==1.26.0",
         "Pillow>=2.8",
         "PyYAML",
         "termcolor",
