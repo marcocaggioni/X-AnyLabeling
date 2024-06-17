@@ -4,8 +4,8 @@ imgviz==1.5.0
 natsort==8.1.0
 termcolor==1.1.0
 PyYAML==6.0
-onnx==1.13.1
-onnxruntime-gpu>=1.16.0
+onnx
+onnxruntime-gpu
 qimage2ndarray==1.10.0
 lapx==0.5.5
 tqdm
