@@ -45,13 +45,13 @@ def get_install_requires():
     install_requires = [
         "imgviz>=0.11",
         "natsort>=7.1.0",
-        "numpy",
+        "numpy==1.9",
         "Pillow>=2.8",
         "PyYAML",
         "termcolor",
         "opencv-python-headless",
         'PyQt5>=5.15.7; platform_system != "Darwin"',
-        "onnx==1.13.1",
+        "onnx",
         "qimage2ndarray==1.10.0",
         "lapx==0.5.5",
         "darkdetect==0.8.0",
@@ -61,6 +61,7 @@ def get_install_requires():
         "pyclipper",
         "filterpy",
         "tokenizers",
+        "pyqt5",
     ]
 
     # Add onnxruntime-gpu if GPU is preferred
@@ -68,10 +69,10 @@ def get_install_requires():
     # Note: onnxruntime-gpu is not available on macOS
     preferred_device = get_preferred_device()
     if preferred_device == "GPU" and platform.system() != "Darwin":
-        install_requires.append("onnxruntime-gpu==1.16.0")
+        install_requires.append("onnxruntime-gpu")
         print("Building AnyLabeling with GPU support")
     else:
-        install_requires.append("onnxruntime==1.16.0")
+        install_requires.append("onnxruntime")
         print("Building AnyLabeling without GPU support")
 
     return install_requires
