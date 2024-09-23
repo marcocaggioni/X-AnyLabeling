@@ -1,3 +1,18 @@
+## Installation via pip
+
+Keeping this fork to make sure pip install works
+Testing on Windows, python 3.11
+
+make an isolated environment and install:
+
+```
+pip install git+https://github.com/marcocaggioni/X-AnyLabeling.git
+```
+
+to start he gui type **anylabeling** (note, not x-anylabeling) from the terminal after activating the environment
+
+
+
 <div align="center">
   <p>
     <a href="https://github.com/CVHub520/X-AnyLabeling/" target="_blank">
