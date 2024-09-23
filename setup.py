@@ -62,6 +62,7 @@ def get_install_requires():
         "filterpy",
         "tokenizers",
         "jsonlines",
+        "importlib_metadata"
     ]
 
     # Add onnxruntime-gpu if GPU is preferred
