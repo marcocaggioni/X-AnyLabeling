@@ -1,5 +1,4 @@
 import warnings
-
 warnings.filterwarnings("ignore")
 
 import os
@@ -67,14 +66,41 @@ class SegmentAnything2Video(Model):
         """
         super().__init__(config_path, on_message)
 
-        # Enable automatic mixed precision for faster computations
-        torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
+        device_type = self.config.get("device_type", "cuda")
+        if device_type == "cuda" and torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif device_type == "mps" and torch.backends.mps.is_available():
+            device = torch.device("mps")
+            # if using Apple MPS, fall back to CPU for unsupported ops
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        else:
+            device = torch.device("cpu")
+        logger.info(f"Using device: {device}")
 
-        if torch.cuda.get_device_properties(0).major >= 8:
-            # turn on tfloat32 for Ampere GPUs
-            # (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
+        if device.type == "cuda":
+            apply_postprocessing = True
+            # Enable automatic mixed precision for faster computations
+            torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
+            if torch.cuda.get_device_properties(0).major >= 8:
+                # turn on tfloat32 for Ampere GPUs
+                # (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+        elif device.type == "mps":
+            apply_postprocessing = True
+            logger.warning(
+                "Support for MPS devices is preliminary. SAM 2 is trained with CUDA and might "
+                "give numerically different outputs and sometimes degraded performance on MPS. "
+                "See e.g. https://github.com/pytorch/pytorch/issues/84936 for a discussion."
+            )
+        elif device.type == "cpu":
+            apply_postprocessing = False
+            logger.warning(
+                "Support for CPU devices is preliminary. SAM 2 is trained with CUDA and might "
+                "give numerically different outputs and sometimes degraded performance on CPU. "
+                "The post-processing step (removing small holes and sprinkles in the output masks) "
+                "will be skipped, but this shouldn't affect the results in most cases."
+            )
 
         # Load the SAM2 predictor models
         self.model_abs_path = self.get_model_abs_path(
@@ -88,10 +114,13 @@ class SegmentAnything2Video(Model):
                 )
             )
         self.model_cfg = self.config["model_cfg"]
-        sam2_image_model = build_sam2(self.model_cfg, self.model_abs_path)
+        sam2_image_model = build_sam2(
+            self.model_cfg, self.model_abs_path, device=device
+        )
         self.image_predictor = SAM2ImagePredictor(sam2_image_model)
         self.video_predictor = build_sam2_camera_predictor(
-            self.model_cfg, self.model_abs_path
+            self.model_cfg, self.model_abs_path,
+            device=device, apply_postprocessing=apply_postprocessing
         )
         self.is_first_init = True
 
@@ -233,18 +262,17 @@ class SegmentAnything2Video(Model):
                     point[0] = int(point[0])
                     point[1] = int(point[1])
                     shape.add_point(QtCore.QPointF(point[0], point[1]))
-                break
-            # Create Polygon shape
-            shape.shape_type = "polygon"
-            shape.group_id = (
-                self.group_ids[index] if index is not None else None
-            )
-            shape.closed = True
-            shape.label = (
-                "AUTOLABEL_OBJECT" if index is None else self.labels[index]
-            )
-            shape.selected = False
-            shapes.append(shape)
+                # Create Polygon shape
+                shape.shape_type = "polygon"
+                shape.group_id = (
+                    self.group_ids[index] if index is not None else None
+                )
+                shape.closed = True
+                shape.label = (
+                    "AUTOLABEL_OBJECT" if index is None else self.labels[index]
+                )
+                shape.selected = False
+                shapes.append(shape)
         elif self.output_mode in ["rectangle", "rotation"]:
             x_min = 100000000
             y_min = 100000000
@@ -264,24 +292,24 @@ class SegmentAnything2Video(Model):
                     y_min = min(y_min, point[1])
                     x_max = max(x_max, point[0])
                     y_max = max(y_max, point[1])
-            # Create Rectangle shape
-            shape = Shape(flags={})
-            shape.add_point(QtCore.QPointF(x_min, y_min))
-            shape.add_point(QtCore.QPointF(x_max, y_min))
-            shape.add_point(QtCore.QPointF(x_max, y_max))
-            shape.add_point(QtCore.QPointF(x_min, y_max))
-            shape.shape_type = (
-                "rectangle" if self.output_mode == "rectangle" else "rotation"
-            )
-            shape.closed = True
-            shape.group_id = (
-                self.group_ids[index] if index is not None else None
-            )
-            shape.label = (
-                "AUTOLABEL_OBJECT" if index is None else self.labels[index]
-            )
-            shape.selected = False
-            shapes.append(shape)
+                # Create Rectangle shape
+                shape = Shape(flags={})
+                shape.add_point(QtCore.QPointF(x_min, y_min))
+                shape.add_point(QtCore.QPointF(x_max, y_min))
+                shape.add_point(QtCore.QPointF(x_max, y_max))
+                shape.add_point(QtCore.QPointF(x_min, y_max))
+                shape.shape_type = (
+                    "rectangle" if self.output_mode == "rectangle" else "rotation"
+                )
+                shape.closed = True
+                shape.group_id = (
+                    self.group_ids[index] if index is not None else None
+                )
+                shape.label = (
+                    "AUTOLABEL_OBJECT" if index is None else self.labels[index]
+                )
+                shape.selected = False
+                shapes.append(shape)
 
         return shapes
 
